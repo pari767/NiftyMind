@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NiftyMind — Compare Portfolios</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #060b14;
+            --surface: #0d1624;
+            --border: rgba(255,255,255,0.08);
+            --accent: #00ffa3;
+            --accent2: #0ea5e9;
+            --gold: #fbbf24;
+            --red: #f87171;
+            --text: #e8f0fe;
+            --muted: #8ba3be;
+            --a-color: #00ffa3;
+            --b-color: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,163,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,163,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none; z-index: 0;
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 40px;
+        }
+
+        .back-btn {
+            font-size: 12px; color: var(--muted);
+            text-decoration: none; letter-spacing: 0.1em;
+            display: flex; align-items: center; gap: 6px;
+            transition: color 0.2s;
+        }
+        .back-btn:hover { color: var(--accent); }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px; font-weight: 800;
+            letter-spacing: 0.1em; color: var(--accent);
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem; font-weight: 800; margin-bottom: 8px;
+        }
+
+        .sub {
+            font-size: 12px; color: var(--muted);
+            margin-bottom: 36px; letter-spacing: 0.05em;
+        }
+
+        /* ── Split layout ── */
+        .split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .portfolio-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+        }
+
+        .portfolio-panel.a { border-top: 3px solid var(--a-color); }
+        .portfolio-panel.b { border-top: 3px solid var(--b-color); }
+
+        .p-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 13px; font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 18px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .p-label.a { color: var(--a-color); }
+        .p-label.b { color: var(--b-color); }
+
+        .p-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+        }
+
+        .p-dot.a { background: var(--a-color); box-shadow: 0 0 8px var(--a-color); }
+        .p-dot.b { background: var(--b-color); box-shadow: 0 0 8px var(--b-color); }
+
+        .panel-title {
+            font-size: 10px; letter-spacing: 0.2em;
+            text-transform: uppercase; color: var(--muted);
+            margin-bottom: 14px;
+        }
+
+        .alloc-grid {
+            display: flex; flex-direction: column; gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .alloc-item label {
+            display: block; font-size: 10px;
+            letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px;
+        }
+
+        .alloc-row {
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .alloc-item input[type="range"] {
+            flex: 1; accent-color: var(--accent); cursor: pointer;
+        }
+
+        .alloc-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px; font-weight: 800;
+            min-width: 38px; text-align: right;
+        }
+
+        .a .alloc-val { color: var(--a-color); }
+        .b .alloc-val { color: var(--b-color); }
+
+        .scenario-row {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+
+        .scenario-btn {
+            flex: 1; min-width: 70px; padding: 7px 4px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px; color: var(--muted);
+            font-family: 'DM Mono', monospace; font-size: 10px;
+            cursor: pointer; transition: all 0.2s; text-align: center;
+        }
+
+        .a .scenario-btn.active { border-color: var(--a-color); color: var(--a-color); background: rgba(0,255,163,0.06); }
+        .b .scenario-btn.active { border-color: var(--b-color); color: var(--b-color); background: rgba(245,158,11,0.06); }
+
+        .run-btn {
+            width: 100%; padding: 12px;
+            border: none; border-radius: 8px;
+            font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        .a .run-btn { background: linear-gradient(135deg, var(--a-color), #00d4a0); color: #000; }
+        .b .run-btn { background: linear-gradient(135deg, var(--b-color), #d97706); color: #000; }
+
+        .run-btn:hover { transform: translateY(-1px); }
+
+        /* ── Results ── */
+        .results { display: none; }
+        .results.visible { display: block; }
+
+        /* ── Stat comparison row ── */
+        .compare-stats {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .cstat-col {
+            padding: 20px;
+            display: flex; flex-direction: column; gap: 16px;
+        }
+
+        .cstat-col.a { border-right: 1px solid var(--border); }
+        .cstat-col.b { border-left: 1px solid var(--border); }
+
+        .cstat-col.center {
+            background: rgba(255,255,255,0.02);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 20px; padding: 20px 14px;
+            min-width: 110px;
+        }
+
+        .cstat-item { display: flex; flex-direction: column; gap: 4px; }
+        .cstat-col.b .cstat-item { align-items: flex-end; }
+
+        .cstat-label {
+            font-size: 9px; color: var(--muted);
+            letter-spacing: 0.15em; text-transform: uppercase;
+        }
+
+        .cstat-value {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem; font-weight: 800;
+        }
+
+        .cstat-value.a { color: var(--a-color); }
+        .cstat-value.b { color: var(--b-color); }
+
+        .vs-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 11px; font-weight: 800;
+            color: var(--muted); letter-spacing: 0.2em;
+        }
+
+        .winner-badge {
+            font-size: 9px; letter-spacing: 0.12em;
+            padding: 3px 8px; border-radius: 4px;
+            text-align: center;
+        }
+
+        .winner-badge.a {
+            background: rgba(0,255,163,0.12);
+            color: var(--a-color);
+            border: 1px solid rgba(0,255,163,0.2);
+        }
+
+        .winner-badge.b {
+            background: rgba(245,158,11,0.12);
+            color: var(--b-color);
+            border: 1px solid rgba(245,158,11,0.2);
+        }
+
+        .winner-badge.tie {
+            background: rgba(148,163,184,0.1);
+            color: var(--muted);
+            border: 1px solid rgba(148,163,184,0.2);
+        }
+
+        /* ── Combined chart ── */
+        .chart-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        #compareChart { max-height: 320px; }
+
+        /* ── Verdict banner ── */
+        .verdict {
+            border-radius: 14px;
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 20px;
+        }
+
+        .verdict.a-wins {
+            background: rgba(0,255,163,0.05);
+            border: 1px solid rgba(0,255,163,0.2);
+        }
+
+        .verdict.b-wins {
+            background: rgba(245,158,11,0.05);
+            border: 1px solid rgba(245,158,11,0.2);
+        }
+
+        .verdict.tied {
+            background: rgba(148,163,184,0.05);
+            border: 1px solid rgba(148,163,184,0.15);
+        }
+
+        .verdict-icon { font-size: 2.5rem; flex-shrink: 0; }
+
+        .verdict-body {}
+
+        .verdict-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem; font-weight: 800; margin-bottom: 6px;
+        }
+
+        .verdict-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+        /* ── Side by side alloc bars ── */
+        .alloc-compare {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .alloc-compare-row {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .alloc-compare-row:last-child { margin-bottom: 0; }
+
+        .ac-label {
+            font-size: 11px; color: var(--muted);
+            width: 130px; flex-shrink: 0;
+        }
+
+        .ac-bars { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+        .ac-bar-wrap {
+            display: flex; align-items: center; gap: 6px; height: 14px;
+        }
+
+        .ac-bar {
+            height: 8px; border-radius: 2px;
+            transition: width 0.5s ease;
+            min-width: 2px;
+        }
+
+        .ac-bar.a { background: var(--a-color); opacity: 0.85; }
+        .ac-bar.b { background: var(--b-color); opacity: 0.85; }
+
+        .ac-pct {
+            font-size: 10px; color: var(--muted);
+            min-width: 28px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <a class="back-btn" href="javascript:history.back()">← Back</a>
+        <div class="logo">NiftyMind</div>
+        <a class="back-btn" href="/">⊞ Sectors</a>
+    </div>
+
+    <h1>⚖ Compare Portfolios</h1>
+    <p class="sub" id="subLine">Build two portfolios and run them head-to-head.</p>
+
+    <!-- Split builder -->
+    <div class="split">
+        <!-- Portfolio A -->
+        <div class="portfolio-panel a" id="panelA">
+            <div class="p-label a"><div class="p-dot a"></div> PORTFOLIO A</div>
+            <div class="panel-title">Allocation</div>
+            <div class="alloc-grid" id="allocA"></div>
+            <div class="panel-title">Scenario</div>
+            <div class="scenario-row" id="scenA">
+                <button class="scenario-btn active" onclick="setScenario('a','normal',this)">📊 Normal</button>
+                <button class="scenario-btn" onclick="setScenario('a','growth',this)">📈 Bull</button>
+                <button class="scenario-btn" onclick="setScenario('a','crash',this)">📉 Crash</button>
+            </div>
+            <button class="run-btn" onclick="runA()">▶ Run Portfolio A</button>
+        </div>
+
+        <!-- Portfolio B -->
+        <div class="portfolio-panel b" id="panelB">
+            <div class="p-label b"><div class="p-dot b"></div> PORTFOLIO B</div>
+            <div class="panel-title">Allocation</div>
+            <div class="alloc-grid" id="allocB"></div>
+            <div class="panel-title">Scenario</div>
+            <div class="scenario-row" id="scenB">
+                <button class="scenario-btn active" onclick="setScenario('b','normal',this)">📊 Normal</button>
+                <button class="scenario-btn" onclick="setScenario('b','growth',this)">📈 Bull</button>
+                <button class="scenario-btn" onclick="setScenario('b','crash',this)">📉 Crash</button>
+            </div>
+            <button class="run-btn" onclick="runB()">▶ Run Portfolio B</button>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+
+        <!-- Verdict -->
+        <div class="verdict" id="verdict">
+            <div class="verdict-icon" id="verdictIcon">🏆</div>
+            <div class="verdict-body">
+                <div class="verdict-title" id="verdictTitle">—</div>
+                <div class="verdict-desc" id="verdictDesc">—</div>
+            </div>
+        </div>
+
+        <!-- Stat comparison -->
+        <div class="compare-stats">
+            <div class="cstat-col a" id="statsA">
+                <div class="cstat-item">
+                    <div class="cstat-label">Portfolio Value</div>
+                    <div class="cstat-value a" id="aValue">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">Risk Level</div>
+                    <div class="cstat-value a" id="aRisk">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">5Y AI Return</div>
+                    <div class="cstat-value a" id="aReturn">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">Scenario</div>
+                    <div class="cstat-value a" id="aScen">—</div>
+                </div>
+            </div>
+
+            <div class="cstat-col center">
+                <div class="vs-label">VS</div>
+                <div class="winner-badge" id="wValue">—</div>
+                <div class="winner-badge" id="wRisk">—</div>
+                <div class="winner-badge" id="wReturn">—</div>
+                <div class="winner-badge" id="wScen" style="visibility:hidden">—</div>
+            </div>
+
+            <div class="cstat-col b" id="statsB">
+                <div class="cstat-item">
+                    <div class="cstat-label">Portfolio Value</div>
+                    <div class="cstat-value b" id="bValue">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">Risk Level</div>
+                    <div class="cstat-value b" id="bRisk">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">5Y AI Return</div>
+                    <div class="cstat-value b" id="bReturn">—</div>
+                </div>
+                <div class="cstat-item">
+                    <div class="cstat-label">Scenario</div>
+                    <div class="cstat-value b" id="bScen">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combined chart -->
+        <div class="chart-panel">
+            <div class="panel-title">5-Year AI Projection — A vs B</div>
+            <canvas id="compareChart"></canvas>
+        </div>
+
+        <!-- Allocation side-by-side bars -->
+        <div class="alloc-compare">
+            <div class="panel-title">Allocation Breakdown — A vs B</div>
+            <div id="allocBars"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+const SECTOR_META = {
+    it:         { name: "Information Tech", icon: "💻" },
+    banking:    { name: "Banking & Finance", icon: "🏦" },
+    pharma:     { name: "Pharmaceuticals",  icon: "💊" },
+    auto:       { name: "Automobile",       icon: "🚗" },
+    energy:     { name: "Energy & Power",   icon: "⚡" },
+    fmcg:       { name: "FMCG",            icon: "🛒" },
+    realestate: { name: "Real Estate",      icon: "🏗️" },
+    infra:      { name: "Infrastructure",   icon: "🌉" },
+    metals:     { name: "Metals & Mining",  icon: "⛏️" },
+};
+
+const RISK_SCORE = { "High Risk": 3, "Medium Risk": 2, "Low Risk": 1 };
+
+let selectedSectors = [];
+let scenarios = { a: "normal", b: "normal" };
+let simData = { a: null, b: null };
+let compareChart;
+
+window.onload = function () {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("sectors") || "it,banking,pharma";
+    selectedSectors = raw.split(",").filter(s => SECTOR_META[s]);
+    if (!selectedSectors.length) selectedSectors = ["it", "banking", "pharma"];
+
+    document.getElementById("subLine").textContent =
+        "Sectors: " + selectedSectors.map(s => SECTOR_META[s].icon + " " + SECTOR_META[s].name).join(" · ");
+
+    buildAllocs("A", selectedSectors);
+    buildAllocs("B", selectedSectors, true); // B gets inverse default weights
+};
+
+function fixDPI(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const dpi = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpi;
+    canvas.height = rect.height * dpi;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpi, dpi);
+    return ctx;
+}
+
+function buildAllocs(which, sectors, inverse = false) {
+    const grid = document.getElementById("alloc" + which);
+    const def = Math.floor(100 / sectors.length);
+
+    // B gets weights skewed toward last sectors for contrast
+    grid.innerHTML = sectors.map((s, i) => {
+        const meta = SECTOR_META[s];
+        let val;
+        if (!inverse) {
+            val = i === 0 ? 100 - def * (sectors.length - 1) : def;
+        } else {
+            // Reverse weight distribution so B looks different by default
+            const ri = sectors.length - 1 - i;
+            val = ri === 0 ? 100 - def * (sectors.length - 1) : def;
+        }
+        const id = which.toLowerCase();
+        return `<div class="alloc-item">
+            <label>${meta.icon} ${meta.name}</label>
+            <div class="alloc-row">
+                <input type="range" id="slider-${id}-${s}" min="0" max="100" value="${val}"
+                       oninput="document.getElementById('val-${id}-${s}').textContent=this.value+'%'">
+                <div class="alloc-val" id="val-${id}-${s}">${val}%</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function setScenario(portfolio, val, btn) {
+    scenarios[portfolio] = val;
+    const row = document.getElementById("scen" + portfolio.toUpperCase());
+    row.querySelectorAll(".scenario-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+}
+
+function getAllocs(which) {
+    const a = {};
+    const id = which.toLowerCase();
+    selectedSectors.forEach(s => {
+        a[s] = parseInt(document.getElementById(`slider-${id}-${s}`).value) || 0;
+    });
+    return a;
+}
+
+function runA() {
+    const alloc = getAllocs("a");
+    const btn = document.querySelector("#panelA .run-btn");
+    btn.textContent = "⏳ Simulating A...";
+    btn.disabled = true;
+
+    fetch("/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...alloc, sectors: selectedSectors, scenario: scenarios.a })
+    })
+    .then(r => r.json())
+    .then(data => {
+        simData.a = data;
+        btn.textContent = "✓ Portfolio A Done";
+        btn.disabled = false;
+        if (simData.a && simData.b) renderComparison();
+        else showPartial("a", data);
+    });
+}
+
+function runB() {
+    const alloc = getAllocs("b");
+    const btn = document.querySelector("#panelB .run-btn");
+    btn.textContent = "⏳ Simulating B...";
+    btn.disabled = true;
+
+    fetch("/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...alloc, sectors: selectedSectors, scenario: scenarios.b })
+    })
+    .then(r => r.json())
+    .then(data => {
+        simData.b = data;
+        btn.textContent = "✓ Portfolio B Done";
+        btn.disabled = false;
+        if (simData.a && simData.b) renderComparison();
+        else showPartial("b", data);
+    });
+}
+
+function showPartial(which, data) {
+    // Show partial results label while waiting for the other
+    const el = which === "a" ? document.getElementById("aValue") : document.getElementById("bValue");
+    el.textContent = "₹" + data.portfolio_value.toLocaleString('en-IN');
+    document.getElementById(which === "a" ? "aRisk" : "bRisk").textContent = data.risk;
+    document.getElementById("results").classList.add("visible");
+}
+
+function renderComparison() {
+    const a = simData.a, b = simData.b;
+    document.getElementById("results").classList.add("visible");
+
+    // ── Values ──
+    const aVal = a.portfolio_value, bVal = b.portfolio_value;
+    document.getElementById("aValue").textContent = "₹" + aVal.toLocaleString('en-IN');
+    document.getElementById("bValue").textContent = "₹" + bVal.toLocaleString('en-IN');
+    setWinner("wValue", aVal, bVal, "higher");
+
+    // ── Risk ──
+    document.getElementById("aRisk").textContent = a.risk;
+    document.getElementById("bRisk").textContent = b.risk;
+    const aRS = RISK_SCORE[a.risk] || 2, bRS = RISK_SCORE[b.risk] || 2;
+    setWinner("wRisk", bRS, aRS, "higher", "Lower Risk"); // lower score = safer = winner
+
+    // ── 5Y AI return (last value) ──
+    const aFinal = a.ai_recommendation[a.ai_recommendation.length - 1];
+    const bFinal = b.ai_recommendation[b.ai_recommendation.length - 1];
+    const aGain = ((aFinal - 100) / 100 * 100).toFixed(1);
+    const bGain = ((bFinal - 100) / 100 * 100).toFixed(1);
+    document.getElementById("aReturn").textContent = (aGain >= 0 ? "+" : "") + aGain + "%";
+    document.getElementById("bReturn").textContent = (bGain >= 0 ? "+" : "") + bGain + "%";
+    setWinner("wReturn", parseFloat(aGain), parseFloat(bGain), "higher");
+
+    // ── Scenario ──
+    const scenLabel = { normal: "📊 Normal", growth: "📈 Bull", crash: "📉 Crash" };
+    document.getElementById("aScen").textContent = scenLabel[scenarios.a];
+    document.getElementById("bScen").textContent = scenLabel[scenarios.b];
+
+    // ── Chart ──
+    drawCompareChart(a.years, a.ai_recommendation, b.ai_recommendation);
+
+    // ── Allocation bars ──
+    drawAllocBars();
+
+    // ── Verdict ──
+    renderVerdict(aGain, bGain, aRS, bRS);
+}
+
+function setWinner(elId, aVal, bVal, mode, label) {
+    const el = document.getElementById(elId);
+    const diff = Math.abs(aVal - bVal);
+    const margin = diff / (Math.max(Math.abs(aVal), Math.abs(bVal)) || 1) * 100;
+
+    if (margin < 2) {
+        el.textContent = "≈ TIE";
+        el.className = "winner-badge tie";
+        return;
+    }
+
+    const aWins = aVal > bVal;
+    el.textContent = aWins ? "A Wins" : "B Wins";
+    el.className = "winner-badge " + (aWins ? "a" : "b");
+    if (label) el.textContent = label + (aWins ? " · A" : " · B");
+}
+
+function drawCompareChart(years, aiA, aiB) {
+    const ctx = fixDPI("compareChart");
+    if (compareChart) compareChart.destroy();
+    compareChart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: years,
+            datasets: [
+                {
+                    label: "Portfolio A (AI)",
+                    data: aiA,
+                    borderColor: "#00ffa3",
+                    backgroundColor: "rgba(0,255,163,0.06)",
+                    borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 4,
+                },
+                {
+                    label: "Portfolio B (AI)",
+                    data: aiB,
+                    borderColor: "#f59e0b",
+                    backgroundColor: "rgba(245,158,11,0.06)",
+                    borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 4,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            animation: { duration: 600, easing: "easeInOutQuart" },
+            plugins: {
+                legend: { labels: { color: "#8ba3be", font: { family: "DM Mono", size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: "#8ba3be" }, grid: { color: "rgba(255,255,255,0.05)" } },
+                y: { ticks: { color: "#8ba3be" }, grid: { color: "rgba(255,255,255,0.05)" } }
+            }
+        }
+    });
+}
+
+function drawAllocBars() {
+    const allocA = getAllocs("a");
+    const allocB = getAllocs("b");
+    const totalA = Object.values(allocA).reduce((x, y) => x + y, 0) || 1;
+    const totalB = Object.values(allocB).reduce((x, y) => x + y, 0) || 1;
+
+    document.getElementById("allocBars").innerHTML = selectedSectors.map(s => {
+        const m = SECTOR_META[s];
+        const pA = Math.round(allocA[s] / totalA * 100);
+        const pB = Math.round(allocB[s] / totalB * 100);
+        return `<div class="alloc-compare-row">
+            <div class="ac-label">${m.icon} ${m.name}</div>
+            <div class="ac-bars">
+                <div class="ac-bar-wrap">
+                    <div class="ac-bar a" style="width:${pA}%"></div>
+                    <span class="ac-pct" style="color:var(--a-color)">${pA}%</span>
+                </div>
+                <div class="ac-bar-wrap">
+                    <div class="ac-bar b" style="width:${pB}%"></div>
+                    <span class="ac-pct" style="color:var(--b-color)">${pB}%</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderVerdict(aGain, bGain, aRisk, bRisk) {
+    const box = document.getElementById("verdict");
+    const icon = document.getElementById("verdictIcon");
+    const title = document.getElementById("verdictTitle");
+    const desc = document.getElementById("verdictDesc");
+
+    const aG = parseFloat(aGain), bG = parseFloat(bGain);
+    const gainDiff = Math.abs(aG - bG);
+    const riskDiff = Math.abs(aRisk - bRisk);
+
+    if (gainDiff < 2 && riskDiff === 0) {
+        box.className = "verdict tied";
+        icon.textContent = "🤝";
+        title.textContent = "Too Close to Call";
+        desc.textContent = "Both portfolios project virtually identical outcomes. Try adjusting allocations or scenarios to create more separation.";
+        return;
+    }
+
+    // Score: higher gain wins, penalise risk
+    const aScore = aG - aRisk * 3;
+    const bScore = bG - bRisk * 3;
+
+    if (aScore >= bScore) {
+        box.className = "verdict a-wins";
+        icon.textContent = "🏆";
+        title.textContent = "Portfolio A has the Edge";
+        desc.textContent = `A projects ${aG >= 0 ? "+" : ""}${aGain}% vs B's ${bG >= 0 ? "+" : ""}${bGain}% over 5 years on the AI path. ${aRisk < bRisk ? "A also carries lower risk, making it the stronger risk-adjusted choice." : "Consider B's lower risk profile if capital preservation matters more."}`;
+    } else {
+        box.className = "verdict b-wins";
+        icon.textContent = "🏆";
+        title.textContent = "Portfolio B has the Edge";
+        desc.textContent = `B projects ${bG >= 0 ? "+" : ""}${bGain}% vs A's ${aG >= 0 ? "+" : ""}${aGain}% over 5 years on the AI path. ${bRisk < aRisk ? "B also carries lower risk, making it the stronger risk-adjusted choice." : "Consider A's lower risk profile if capital preservation matters more."}`;
+    }
+}
+</script>
+</body>
+</html>

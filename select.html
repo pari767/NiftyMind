@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NiftyMind — Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #03080f;
+            --surface: #070f1a;
+            --glass: rgba(255,255,255,0.025);
+            --border: rgba(255,255,255,0.07);
+            --accent: #00ffe0;
+            --accent-dim: rgba(0,255,224,0.12);
+            --warn: #ff6b35;
+            --warn-dim: rgba(255,107,53,0.1);
+            --gold: #ffd166;
+            --text: #d4e5f7;
+            --muted: #3a4f66;
+            --dim: #1a2840;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+
+        }
+
+        h1, .hero-desc, .eyebrow, .hero-left {
+            cursor: default;
+        }
+
+        /* ── Scanlines overlay ── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* ── Noise texture ── */
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 99; opacity: 0.6;
+        }
+
+        /* ── Animated radar blob ── */
+        .radar {
+            position: fixed;
+            top: -300px; right: -300px;
+            width: 700px; height: 700px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,255,224,0.04) 0%, transparent 70%);
+            animation: radarSpin 20s linear infinite;
+            pointer-events: none; z-index: 0;
+        }
+
+        @keyframes radarSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .blob-bottom {
+            position: fixed;
+            bottom: -200px; left: -100px;
+            width: 500px; height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,107,53,0.04) 0%, transparent 70%);
+            animation: blobPulse 8s ease-in-out infinite;
+            pointer-events: none; z-index: 0;
+        }
+
+        @keyframes blobPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        /* ── Layout ── */
+        .page {
+            position: relative; z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 32px 100px;
+        }
+
+        /* ── Topbar ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 80px;
+        }
+
+        .logo {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 22px;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(0,255,224,0.4);
+        }
+
+        .ticker-strip {
+            display: flex;
+            gap: 24px;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .ticker-item { display: flex; gap: 6px; align-items: center; }
+        .ticker-item .up { color: var(--accent); }
+        .ticker-item .dn { color: var(--warn); }
+
+        .status-dot {
+            width: 7px; height: 7px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent);
+            animation: blink 1.5s ease infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
+        .status-pill {
+            display: flex; align-items: center; gap: 7px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--accent);
+            background: var(--accent-dim);
+            border: 1px solid rgba(0,255,224,0.2);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        /* ── Hero ── */
+        .hero {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 40px;
+            align-items: end;
+            margin-bottom: 72px;
+        }
+
+        .hero-left {}
+
+        .eyebrow {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .eyebrow::before {
+            content: '';
+            width: 40px; height: 1px;
+            background: var(--muted);
+        }
+
+        h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(4rem, 9vw, 8rem);
+            line-height: 0.9;
+            letter-spacing: 0.02em;
+            margin-bottom: 24px;
+        }
+
+        h1 .line1 { display: block; color: var(--text); }
+        h1 .line2 {
+            display: block;
+            background: linear-gradient(90deg, var(--accent), #0af5c4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        h1 .line3 {
+            display: block;
+            color: var(--warn);
+            -webkit-text-stroke: 1px var(--warn);
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-desc {
+            font-size: 15px;
+            color: var(--muted);
+            line-height: 1.7;
+            max-width: 480px;
+        }
+
+        .hero-right {
+            text-align: right;
+        }
+
+        .big-num {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 7rem;
+            line-height: 1;
+            color: var(--dim);
+            letter-spacing: 0.05em;
+        }
+
+        .big-num-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.2em;
+        }
+
+        /* ── Instruction bar ── */
+        .instr-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+        }
+
+        .instr-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .instr-label .line {
+            width: 50px; height: 1px;
+            background: var(--border);
+        }
+
+        .sel-badge {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: var(--gold);
+            background: rgba(255,209,102,0.08);
+            border: 1px solid rgba(255,209,102,0.2);
+            padding: 6px 14px;
+            border-radius: 4px;
+        }
+
+        /* ── Sector Grid ── */
+        .sector-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            margin-bottom: 48px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .sector-card {
+            position: relative;
+            background: var(--surface);
+            padding: 28px 24px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+            border: 1px solid transparent;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* diagonal stripe on hover */
+        .sector-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.015), transparent);
+            transition: left 0.4s ease;
+        }
+
+        .sector-card:hover::before { left: 140%; }
+
+        /* corner accent */
+        .sector-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 0;
+            background: var(--c-accent, var(--accent));
+            transition: height 0.25s ease;
+        }
+
+        .sector-card:hover::after { height: 100%; }
+
+        .sector-card:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .sector-card.selected {
+            background: var(--c-bg, var(--accent-dim));
+            border-color: var(--c-accent, var(--accent));
+        }
+
+        .sector-card.selected::after { height: 100%; }
+
+        /* Checkmark */
+        .check {
+            position: absolute;
+            top: 14px; right: 16px;
+            width: 20px; height: 20px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+            color: transparent;
+            background: transparent;
+            transition: all 0.2s;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .sector-card.selected .check {
+            background: var(--c-accent, var(--accent));
+            border-color: var(--c-accent, var(--accent));
+            color: #000;
+        }
+
+        .card-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .card-icon {
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+
+        .card-meta {}
+
+        .card-code {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            color: var(--c-accent, var(--muted));
+            letter-spacing: 0.2em;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .sector-card.selected .card-code { opacity: 1; }
+
+        .card-name {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 22px;
+            letter-spacing: 0.05em;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .card-tickers {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            margin-bottom: 12px;
+            letter-spacing: 0.05em;
+        }
+
+        .card-desc {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* Risk bar */
+        .risk-bar {
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .risk-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            width: 30px;
+            flex-shrink: 0;
+        }
+
+        .risk-track {
+            flex: 1;
+            height: 2px;
+            background: var(--dim);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        .risk-fill {
+            height: 100%;
+            border-radius: 1px;
+            background: var(--c-accent, var(--accent));
+            transition: width 0.4s ease;
+        }
+
+        .risk-val {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            color: var(--muted);
+            width: 24px;
+            text-align: right;
+        }
+
+        /* ── Simulate preview sparkline ── */
+        .sparkline {
+            margin-top: 12px;
+            height: 30px;
+            width: 100%;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+        }
+
+        .sector-card:hover .sparkline,
+        .sector-card.selected .sparkline { opacity: 1; }
+
+        /* ── Bottom Action Area ── */
+        .action-area {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .selected-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .sel-chip {
+            display: flex; align-items: center; gap: 6px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            padding: 6px 12px;
+            border-radius: 2px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(0,255,224,0.2);
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            animation: chipIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+        }
+
+        @keyframes chipIn {
+            from { transform: scale(0.7) translateY(6px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .sel-chip .remove {
+            opacity: 0.5;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            margin-left: 2px;
+        }
+        .sel-chip .remove:hover { opacity: 1; }
+
+        .empty-hint {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .launch-btn {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 18px 36px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 2px;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 20px;
+            letter-spacing: 0.15em;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .launch-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0);
+            transition: background 0.2s;
+        }
+
+        .launch-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 40px rgba(0,255,224,0.35), 0 0 80px rgba(0,255,224,0.1);
+        }
+
+        .launch-btn:disabled {
+            background: var(--dim);
+            color: var(--muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .launch-btn .arrow {
+            font-size: 18px;
+            transition: transform 0.2s;
+        }
+
+        .launch-btn:not(:disabled):hover .arrow {
+            transform: translateX(5px);
+        }
+
+        .launch-meta {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+            margin-top: 12px;
+            text-align: right;
+        }
+
+        /* ── Glitch anim on logo ── */
+        @keyframes glitch {
+            0%   { text-shadow: 0 0 20px rgba(0,255,224,0.4); clip-path: none; transform: none; }
+            95%  { text-shadow: 0 0 20px rgba(0,255,224,0.4); clip-path: none; transform: none; }
+            96%  { text-shadow: 2px 0 rgba(255,0,80,0.7), -2px 0 rgba(0,255,224,0.7); transform: skewX(4deg); }
+            97%  { text-shadow: -2px 0 rgba(255,0,80,0.7), 2px 0 rgba(0,255,224,0.7); transform: skewX(-4deg); }
+            98%  { text-shadow: 0 0 20px rgba(0,255,224,0.4); transform: none; }
+            100% { text-shadow: 0 0 20px rgba(0,255,224,0.4); clip-path: none; transform: none; }
+        }
+
+        .logo { animation: glitch 6s ease infinite; }
+
+        /* ── Market mood bar ── */
+        .mood-bar {
+            display: flex;
+            gap: 0;
+            margin-bottom: 48px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            height: 6px;
+        }
+
+        .mood-seg {
+            height: 100%;
+            transition: flex 1s ease;
+        }
+
+        /* ── Fade in stagger ── */
+        .sector-card {
+            animation: fadeUp 0.5s ease both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 720px) {
+            .sector-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero { grid-template-columns: 1fr; }
+            .hero-right { display: none; }
+            .action-area { grid-template-columns: 1fr; }
+            .ticker-strip { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .sector-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="radar"></div>
+<div class="blob-bottom"></div>
+
+<div class="page">
+
+    <!-- Topbar -->
+    <div class="topbar">
+        <div class="logo">NiftyMind</div>
+        <div class="ticker-strip" id="tickerStrip">
+            <div class="ticker-item">SENSEX <span class="up">▲ 1.2%</span></div>
+            <div class="ticker-item">NIFTY50 <span class="up">▲ 0.8%</span></div>
+            <div class="ticker-item">₹/$ <span class="dn">▼ 0.3%</span></div>
+            <div class="ticker-item">CRUDE <span class="up">▲ 2.1%</span></div>
+        </div>
+        <div class="status-pill"><div class="status-dot"></div> LIVE FEED</div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-left">
+            <div class="eyebrow">Portfolio Command System</div>
+            <h1>
+                <span class="line1">DEFINE</span>
+                <span class="line2">YOUR</span>
+                <span class="line3">ARENA</span>
+            </h1>
+            <p class="hero-desc">
+                Select the market sectors you want to simulate, stress-test,
+                and optimise. AI will model 5-year trajectories across bull runs,
+                crashes, and live shock events.
+            </p>
+        </div>
+        <div class="hero-right">
+            <div class="big-num" id="bigNum">00</div>
+            <div class="big-num-label">SECTORS SELECTED</div>
+        </div>
+    </div>
+
+    <!-- Mood bar (decorative) -->
+    <div class="mood-bar">
+        <div class="mood-seg" style="flex:3;background:rgba(0,255,224,0.6)"></div>
+        <div class="mood-seg" style="flex:2;background:rgba(255,209,102,0.5)"></div>
+        <div class="mood-seg" style="flex:1.5;background:rgba(255,107,53,0.5)"></div>
+        <div class="mood-seg" style="flex:3.5;background:rgba(0,255,224,0.3)"></div>
+        <div class="mood-seg" style="flex:1;background:rgba(255,107,53,0.4)"></div>
+        <div class="mood-seg" style="flex:2;background:rgba(255,209,102,0.3)"></div>
+    </div>
+
+    <!-- Instruction bar -->
+    <div class="instr-bar">
+        <div class="instr-label">
+            <span class="line"></span>
+            Select sectors to simulate
+        </div>
+        <div class="sel-badge" id="selBadge">0 / 9 SELECTED</div>
+    </div>
+
+    <!-- Sector Grid -->
+    <div class="sector-grid" id="sectorGrid"></div>
+
+    <!-- Action Area -->
+    <div class="action-area">
+        <div>
+            <div class="selected-list" id="selectedList">
+                <div class="empty-hint">No sectors selected yet.</div>
+            </div>
+        </div>
+        <div style="text-align:right">
+            <button class="launch-btn" id="launchBtn" onclick="goNext()" disabled>
+                LAUNCH <span class="arrow">→</span>
+            </button>
+            <div class="launch-meta" id="launchMeta">Select at least 1 sector to proceed</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const sectors = [
+    {
+        id: "it",
+        name: "INFORMATION TECH",
+        code: "BSE:IT",
+        icon: "💻",
+        tickers: "INFY · TCS · WIPRO · HCLTECH",
+        desc: "Cloud, software & digital services. High growth, high volatility.",
+        risk: 82,
+        riskLabel: "HIGH",
+        accent: "#00ffe0",
+        bg: "rgba(0,255,224,0.05)",
+        spark: [40,55,48,70,65,80,75,90,85,95],
+    },
+    {
+        id: "banking",
+        name: "BANKING & FINANCE",
+        code: "BSE:BANK",
+        icon: "🏦",
+        tickers: "HDFCBANK · ICICI · SBI · AXIS",
+        desc: "Retail & institutional banking. Tracks economic cycles closely.",
+        risk: 62,
+        riskLabel: "MED-HIGH",
+        accent: "#60a5fa",
+        bg: "rgba(96,165,250,0.05)",
+        spark: [50,45,60,55,65,70,62,78,80,85],
+    },
+    {
+        id: "pharma",
+        name: "PHARMACEUTICALS",
+        code: "BSE:PHARMA",
+        icon: "💊",
+        tickers: "SUNPHARMA · DRREDDY · CIPLA",
+        desc: "Drug manufacturing & healthcare. Defensive, steady long-term play.",
+        risk: 38,
+        riskLabel: "LOW",
+        accent: "#f472b6",
+        bg: "rgba(244,114,182,0.05)",
+        spark: [60,62,58,65,63,68,70,67,72,75],
+    },
+    {
+        id: "auto",
+        name: "AUTOMOBILE",
+        code: "BSE:AUTO",
+        icon: "🚗",
+        tickers: "TATAMOTORS · M&M · MARUTI",
+        desc: "Cars, EVs & components. Cyclical; tracks consumer spending.",
+        risk: 75,
+        riskLabel: "HIGH",
+        accent: "#fb923c",
+        bg: "rgba(251,146,60,0.05)",
+        spark: [50,60,45,70,55,80,65,75,85,78],
+    },
+    {
+        id: "energy",
+        name: "ENERGY & POWER",
+        code: "BSE:ENERGY",
+        icon: "⚡",
+        tickers: "RELIANCE · NTPC · ONGC · ADANI",
+        desc: "Oil, gas, renewables & utilities. Inflation-linked returns.",
+        risk: 50,
+        riskLabel: "MEDIUM",
+        accent: "#facc15",
+        bg: "rgba(250,204,21,0.05)",
+        spark: [55,58,52,60,65,62,68,72,70,75],
+    },
+    {
+        id: "fmcg",
+        name: "FMCG",
+        code: "BSE:FMCG",
+        icon: "🛒",
+        tickers: "HUL · ITC · NESTLE · DABUR",
+        desc: "Fast-moving consumer goods. Resilient across market cycles.",
+        risk: 28,
+        riskLabel: "LOW",
+        accent: "#a78bfa",
+        bg: "rgba(167,139,250,0.05)",
+        spark: [65,64,66,65,68,67,70,69,72,74],
+    },
+    {
+        id: "realestate",
+        name: "REAL ESTATE",
+        code: "BSE:REALTY",
+        icon: "🏗️",
+        tickers: "DLF · GODREJ PROP · PRESTIGE",
+        desc: "Residential & commercial property. Long gestation, high reward.",
+        risk: 80,
+        riskLabel: "HIGH",
+        accent: "#34d399",
+        bg: "rgba(52,211,153,0.05)",
+        spark: [40,38,55,50,70,60,80,75,90,85],
+    },
+    {
+        id: "infra",
+        name: "INFRASTRUCTURE",
+        code: "BSE:INFRA",
+        icon: "🌉",
+        tickers: "L&T · IRB · ADANIPORTS · BHEL",
+        desc: "Roads, ports, airports. Long-duration capex-driven growth.",
+        risk: 55,
+        riskLabel: "MEDIUM",
+        accent: "#2dd4bf",
+        bg: "rgba(45,212,191,0.05)",
+        spark: [45,50,55,52,60,65,62,68,72,78],
+    },
+    {
+        id: "metals",
+        name: "METALS & MINING",
+        code: "BSE:METAL",
+        icon: "⛏️",
+        tickers: "TATASTEEL · HINDALCO · VEDANTA",
+        desc: "Steel, aluminium, copper. Commodity-cycle sensitive.",
+        risk: 78,
+        riskLabel: "HIGH",
+        accent: "#94a3b8",
+        bg: "rgba(148,163,184,0.05)",
+        spark: [60,40,70,45,75,50,80,55,70,65],
+    },
+];
+
+let selected = new Set();
+
+function buildSparkPath(data) {
+    const w = 120, h = 30;
+    const min = Math.min(...data), max = Math.max(...data);
+    const range = max - min || 1;
+    const pts = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - ((v - min) / range) * h;
+        return `${x},${y}`;
+    });
+    return `M${pts.join(' L')}`;
+}
+
+function renderGrid() {
+    const grid = document.getElementById("sectorGrid");
+    grid.innerHTML = sectors.map((s, i) => {
+        const path = buildSparkPath(s.spark);
+        return `
+        <div class="sector-card" id="card-${s.id}"
+             style="--c-accent:${s.accent};--c-bg:${s.bg};animation-delay:${i*0.04}s"
+             onclick="toggle('${s.id}')">
+            <div class="check">✓</div>
+            <div class="card-top">
+                <div class="card-icon">${s.icon}</div>
+                <div class="card-meta">
+                    <div class="card-code">${s.code}</div>
+                    <div class="card-name">${s.name}</div>
+                </div>
+            </div>
+            <div class="card-tickers">${s.tickers}</div>
+            <div class="card-desc">${s.desc}</div>
+            <svg class="sparkline" viewBox="0 0 120 30" preserveAspectRatio="none">
+                <path d="${path}" fill="none" stroke="${s.accent}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="${path} L120,30 L0,30 Z" fill="${s.accent}" fill-opacity="0.07"/>
+            </svg>
+            <div class="risk-bar">
+                <div class="risk-label">RISK</div>
+                <div class="risk-track">
+                    <div class="risk-fill" style="width:${s.risk}%;background:${s.accent}"></div>
+                </div>
+                <div class="risk-val" style="color:${s.accent}">${s.riskLabel}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggle(id) {
+    const card = document.getElementById("card-" + id);
+    if (selected.has(id)) {
+        selected.delete(id);
+        card.classList.remove("selected");
+    } else {
+        selected.add(id);
+        card.classList.add("selected");
+    }
+    updateUI();
+}
+
+function removeChip(id) {
+    selected.delete(id);
+    document.getElementById("card-" + id).classList.remove("selected");
+    updateUI();
+}
+
+function updateUI() {
+    const count = selected.size;
+    const padded = String(count).padStart(2, "0");
+
+    document.getElementById("bigNum").textContent = padded;
+    document.getElementById("selBadge").textContent = `${count} / 9 SELECTED`;
+
+    const list = document.getElementById("selectedList");
+    if (count === 0) {
+        list.innerHTML = '<div class="empty-hint">No sectors selected yet.</div>';
+    } else {
+        list.innerHTML = [...selected].map(id => {
+            const s = sectors.find(x => x.id === id);
+            return `<div class="sel-chip" style="background:${s.bg};border-color:${s.accent}30;color:${s.accent}">
+                ${s.icon} ${s.id.toUpperCase()}
+                <span class="remove" onclick="removeChip('${id}');event.stopPropagation()">✕</span>
+            </div>`;
+        }).join('');
+    }
+
+    const btn = document.getElementById("launchBtn");
+    btn.disabled = count === 0;
+
+    const meta = document.getElementById("launchMeta");
+    if (count === 0) meta.textContent = "Select at least 1 sector to proceed";
+    else if (count === 1) meta.textContent = "Add 1 more for diversification analysis";
+    else meta.textContent = `${count} sector${count > 1 ? 's' : ''} → Dashboard ready`;
+}
+
+function goNext() {
+    if (selected.size === 0) return;
+    window.location.href = "/dashboard?sectors=" + [...selected].join(",");
+}
+
+// Animate ticker numbers
+function animateTicker() {
+    const items = document.querySelectorAll(".ticker-item .up, .ticker-item .dn");
+    items.forEach(el => {
+        const base = parseFloat(el.textContent.replace(/[▲▼%]/g, ''));
+        const drift = (Math.random() - 0.5) * 0.3;
+        const val = Math.abs(base + drift).toFixed(1);
+        const wasUp = el.classList.contains("up");
+        el.textContent = (wasUp ? "▲ " : "▼ ") + val + "%";
+    });
+}
+
+setInterval(animateTicker, 3000);
+
+renderGrid();
+</script>
+</body>
+</html>

@@ -177,4 +177,4 @@ MIT License — free to use, modify, and distribute.
 
 ---
 
-*Built for the AI Agents Hackathon 2025 · NiftyMind Team*
+*Built for the AI Agents Hackathon 2025*
